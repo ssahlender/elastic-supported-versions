@@ -99,10 +99,7 @@ To enable the page:
 3. Set Source to GitHub Actions.
 4. Run the "Update GitHub Pages" workflow manually once.
 
-After deployment, the site will be available at:
-
-```text
-https://ssahlender.github.io/elastic-supported-versions/
-```
+After deployment, the site will be available at
+<https://ssahlender.github.io/elastic-supported-versions/>.
 
 The workflow also runs daily at 06:00 UTC.
