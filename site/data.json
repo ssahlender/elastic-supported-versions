@@ -1,0 +1,34 @@
+{
+  "evaluated_at": "2026-05-06",
+  "maintained_minor_lines": [
+    {
+      "end_of_maintenance": "2027-10-15",
+      "latest_release": "9.4.0",
+      "minor_line": "9.4.x",
+      "reason": "one of the two newest minor releases of the current major",
+      "released": "2026-05-05",
+      "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.4.0"
+    },
+    {
+      "end_of_maintenance": "2027-10-15",
+      "latest_release": "9.3.4",
+      "minor_line": "9.3.x",
+      "reason": "one of the two newest minor releases of the current major",
+      "released": "2026-04-30",
+      "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.3.4"
+    },
+    {
+      "end_of_maintenance": "2027-01-15",
+      "latest_release": "8.19.15",
+      "minor_line": "8.19.x",
+      "reason": "final minor release of the previous major",
+      "released": "2026-04-30",
+      "url": "https://github.com/elastic/elasticsearch/releases/tag/v8.19.15"
+    }
+  ],
+  "product": "Elasticsearch",
+  "sources": [
+    "GitHub releases API",
+    "Elastic EOL policy page"
+  ]
+}

@@ -23,6 +23,7 @@ import datetime as dt
 import html
 import json
 import os
+from pathlib import Path
 import re
 import ssl
 import sys
@@ -302,6 +303,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--at", default=dt.date.today().isoformat(), help="evaluation date, YYYY-MM-DD")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of text")
     parser.add_argument(
+        "--output",
+        help="write JSON output to this path; implies --json for the file content",
+    )
+    parser.add_argument(
         "--ignore-eol-page",
         action="store_true",
         help="calculate maintenance windows from GitHub release dates only",
@@ -352,6 +357,14 @@ def main() -> int:
         "sources": source_notes,
         "maintained_minor_lines": lines,
     }
+
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        if not args.json:
+            print(f"Wrote {output_path}")
+            return 0
 
     if args.json:
         print(json.dumps(output, indent=2, sort_keys=True))

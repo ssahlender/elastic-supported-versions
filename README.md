@@ -44,6 +44,12 @@ Emit JSON:
 ./elastic_supported_versions.py --json
 ```
 
+Write JSON for the static web page:
+
+```bash
+./elastic_supported_versions.py --output site/data.json
+```
+
 Use a specific CA bundle:
 
 ```bash
@@ -80,3 +86,23 @@ Elasticsearch maintained minor lines on 2026-05-06:
 Sources: GitHub releases API, Elastic EOL policy page
 ```
 
+## GitHub Pages
+
+This repository includes a static GitHub Pages site in `site/`. GitHub Pages
+does not run Python on request, so the included workflow generates
+`site/data.json` first and then deploys the static files.
+
+To enable the page:
+
+1. Push this repository to GitHub.
+2. Open repository Settings -> Pages.
+3. Set Source to GitHub Actions.
+4. Run the "Update GitHub Pages" workflow manually once.
+
+After deployment, the site will be available at:
+
+```text
+https://<user>.github.io/<repo>/
+```
+
+The workflow also runs daily at 06:00 UTC.

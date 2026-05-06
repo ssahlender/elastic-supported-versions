@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Elasticsearch Supported Versions</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="header-band" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Elastic maintenance tracker</p>
+          <h1 id="page-title">Elasticsearch Supported Versions</h1>
+          <p class="summary" id="summary">Loading current maintenance lines...</p>
+        </div>
+        <a class="source-link" href="https://www.elastic.co/support/eol">Elastic EOL policy</a>
+      </section>
+
+      <section class="status-panel" aria-live="polite">
+        <div class="meta-grid">
+          <div>
+            <span class="label">Evaluated</span>
+            <strong id="evaluated-at">-</strong>
+          </div>
+          <div>
+            <span class="label">Product</span>
+            <strong id="product">-</strong>
+          </div>
+          <div>
+            <span class="label">Sources</span>
+            <strong id="sources">-</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="versions" aria-labelledby="versions-title">
+        <h2 id="versions-title">Maintained Minor Lines</h2>
+        <div class="version-grid" id="version-grid"></div>
+        <p class="error-message" id="error-message" hidden></p>
+      </section>
+    </main>
+
+    <template id="version-card-template">
+      <article class="version-card">
+        <div>
+          <span class="line-label">Minor line</span>
+          <h3></h3>
+        </div>
+        <dl>
+          <div>
+            <dt>Latest release</dt>
+            <dd data-field="latest_release"></dd>
+          </div>
+          <div>
+            <dt>Released</dt>
+            <dd data-field="released"></dd>
+          </div>
+          <div>
+            <dt>Maintenance through</dt>
+            <dd data-field="end_of_maintenance"></dd>
+          </div>
+        </dl>
+        <p data-field="reason"></p>
+        <a data-field="url" href="#">View release</a>
+      </article>
+    </template>
+
+    <script>
+      async function loadVersions() {
+        const response = await fetch("data.json", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Could not load generated version data.");
+        }
+        return response.json();
+      }
+
+      function render(data) {
+        const lines = data.maintained_minor_lines || [];
+        document.getElementById("evaluated-at").textContent = data.evaluated_at || "-";
+        document.getElementById("product").textContent = data.product || "-";
+        document.getElementById("sources").textContent = (data.sources || []).join(", ") || "-";
+        document.getElementById("summary").textContent =
+          lines.length === 1
+            ? "1 minor line is currently inside Elastic maintenance policy."
+            : `${lines.length} minor lines are currently inside Elastic maintenance policy.`;
+
+        const template = document.getElementById("version-card-template");
+        const grid = document.getElementById("version-grid");
+        grid.replaceChildren();
+
+        for (const line of lines) {
+          const card = template.content.cloneNode(true);
+          card.querySelector("h3").textContent = line.minor_line;
+          card.querySelector('[data-field="latest_release"]').textContent = line.latest_release;
+          card.querySelector('[data-field="released"]').textContent = line.released;
+          card.querySelector('[data-field="end_of_maintenance"]').textContent = line.end_of_maintenance;
+          card.querySelector('[data-field="reason"]').textContent = line.reason;
+          const link = card.querySelector('[data-field="url"]');
+          link.href = line.url;
+          grid.appendChild(card);
+        }
+      }
+
+      loadVersions()
+        .then(render)
+        .catch((error) => {
+          document.getElementById("summary").textContent = "Version data is unavailable.";
+          const errorMessage = document.getElementById("error-message");
+          errorMessage.textContent = error.message;
+          errorMessage.hidden = false;
+        });
+    </script>
+  </body>
+</html>
