@@ -102,7 +102,7 @@ To enable the page:
 After deployment, the site will be available at:
 
 ```text
-https://<user>.github.io/<repo>/
+https://ssahlender.github.io/elastic-supported-versions/
 ```
 
 The workflow also runs daily at 06:00 UTC.
