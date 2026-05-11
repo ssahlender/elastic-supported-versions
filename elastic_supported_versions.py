@@ -46,6 +46,16 @@ DEFAULT_CA_FILES = (
     "/etc/ssl/ca-bundle.pem",
     "/etc/ssl/cert.pem",
 )
+DOCKER_HUB_REPLICATION_IMAGES = (
+    ("elasticsearch", "elastic/elasticsearch"),
+    ("filebeat", "elastic/filebeat"),
+    ("kibana", "elastic/kibana"),
+    ("logstash", "elastic/logstash"),
+    ("metricbeat", "elastic/metricbeat"),
+)
+DEFAULT_REPLICATION_RULE_PREFIX = "harbor-elastic"
+ECK_OPERATOR_REPLICATION_RULE_SUFFIX = "eckoperator"
+ECK_OPERATOR_IMAGE = "elastic/eck-operator"
 
 
 @dataclass(frozen=True)
@@ -296,12 +306,103 @@ def maintained_lines(releases: list[Release], terms: dict[int, dt.date], at: dt.
     return result
 
 
+def replication_rule_name(prefix: str, suffix: str) -> str:
+    return f"{prefix}-{suffix}" if prefix else suffix
+
+
+def docker_pull_commands(version: str, *, replication_rule_prefix: str) -> list[dict[str, str]]:
+    return [
+        {
+            "replication_rule": replication_rule_name(replication_rule_prefix, suffix),
+            "registry": "Docker Hub",
+            "image": image,
+            "command": f"docker pull {image}:{version}",
+        }
+        for suffix, image in DOCKER_HUB_REPLICATION_IMAGES
+    ]
+
+
+def render_mail_template(
+    output: dict[str, object],
+    *,
+    eck_operator_version: str | None = None,
+    replication_rule_prefix: str = DEFAULT_REPLICATION_RULE_PREFIX,
+) -> str:
+    lines = output["maintained_minor_lines"]
+    if not isinstance(lines, list):
+        raise ValueError("maintained_minor_lines must be a list")
+
+    message: list[str] = [
+        "Subject: Harbor Replication Rules fuer Elastic Stack aktualisieren",
+        "",
+        "Hallo zusammen,",
+        "",
+        "koennt ihr bitte die Harbor Replication Rules fuer die aktuell supporteten Elastic Stack Versionen aktualisieren?",
+        "",
+        f"Stand: {output['evaluated_at']}",
+        "",
+        "Rules:",
+    ]
+
+    for suffix, image in DOCKER_HUB_REPLICATION_IMAGES:
+        message.append(f"- {replication_rule_name(replication_rule_prefix, suffix)} (Docker Hub, {image})")
+
+    if eck_operator_version:
+        eck_rule = replication_rule_name(replication_rule_prefix, ECK_OPERATOR_REPLICATION_RULE_SUFFIX)
+        message.append(f"- {eck_rule} (Docker Hub, {ECK_OPERATOR_IMAGE})")
+
+    message.extend(["", "Docker Pulls:"])
+    if eck_operator_version:
+        message.extend(
+            [
+                f"docker pull {ECK_OPERATOR_IMAGE}:{eck_operator_version}  # {eck_rule}",
+            ]
+        )
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        version = str(line["latest_release"])
+        message.extend(
+            [
+                "",
+                f"{line['minor_line']} aktueller Patch: {version}",
+            ]
+        )
+        for command in docker_pull_commands(version, replication_rule_prefix=replication_rule_prefix):
+            message.append(f"{command['command']}  # {command['replication_rule']}")
+
+    message.extend(
+        [
+            "",
+            "Danke",
+        ]
+    )
+    return "\n".join(message)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Show Elasticsearch versions that should receive maintenance/security updates.",
     )
     parser.add_argument("--at", default=dt.date.today().isoformat(), help="evaluation date, YYYY-MM-DD")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of text")
+    parser.add_argument(
+        "--mail-template",
+        action="store_true",
+        help="emit a mail template for Harbor replication-rule requests",
+    )
+    parser.add_argument(
+        "--eck-operator-version",
+        help="include an ECK operator docker pull command with this explicit operator version",
+    )
+    parser.add_argument(
+        "--replication-rule-prefix",
+        default=DEFAULT_REPLICATION_RULE_PREFIX,
+        help=(
+            "Harbor replication rule prefix used in mail templates "
+            f"(default: {DEFAULT_REPLICATION_RULE_PREFIX})"
+        ),
+    )
     parser.add_argument(
         "--output",
         help="write JSON output to this path; implies --json for the file content",
@@ -365,6 +466,16 @@ def main() -> int:
         if not args.json:
             print(f"Wrote {output_path}")
             return 0
+
+    if args.mail_template:
+        print(
+            render_mail_template(
+                output,
+                eck_operator_version=args.eck_operator_version,
+                replication_rule_prefix=args.replication_rule_prefix,
+            )
+        )
+        return 0
 
     if args.json:
         print(json.dumps(output, indent=2, sort_keys=True))

@@ -50,6 +50,34 @@ Write JSON for the static web page:
 ./elastic_supported_versions.py --output site/data.json
 ```
 
+Emit a short German mail template for the Harbor replication-rule request:
+
+```bash
+./elastic_supported_versions.py --mail-template
+```
+
+The template includes Docker pull commands for the maintained Elasticsearch
+patch versions and these Docker Hub replication rules:
+
+- `harbor-elastic-elasticsearch`
+- `harbor-elastic-filebeat`
+- `harbor-elastic-kibana`
+- `harbor-elastic-logstash`
+- `harbor-elastic-metricbeat`
+
+Use `--replication-rule-prefix` if your Harbor rules use a different prefix:
+
+```bash
+./elastic_supported_versions.py --mail-template --replication-rule-prefix my-elastic
+```
+
+If the ECK operator rule also needs a specific operator tag, pass it explicitly.
+Without this option, ECK is not included in the mail template.
+
+```bash
+./elastic_supported_versions.py --mail-template --eck-operator-version 3.1.0
+```
+
 Use a specific CA bundle:
 
 ```bash
