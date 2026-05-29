@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Report Elasticsearch minor lines that should receive maintenance/security fixes.
+Report Elastic product minor lines that should receive maintenance/security fixes.
 
 Policy implemented from Elastic's Product & Version End of Life Policy:
   * a major release is maintained for the longer of 30 months from its GA or
@@ -8,7 +8,7 @@ Policy implemented from Elastic's Product & Version End of Life Policy:
   * within maintained majors, Elastic maintains the two newest minor releases
     of the current major and the final minor release of the previous major.
 
-By default this script reads GitHub's machine-readable releases API and the
+By default this script reads GitHub's machine-readable releases APIs and the
 Elastic EOL policy page:
 
     python3 elastic_supported_versions.py
@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 
-GITHUB_RELEASES_API = "https://api.github.com/repos/elastic/elasticsearch/releases"
+GITHUB_RELEASES_API_TEMPLATE = "https://api.github.com/repos/{repo}/releases"
 ELASTIC_EOL_URL = "https://www.elastic.co/support/eol"
 VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 DATE_RE = re.compile(r"(\d{1,2}-[A-Za-z]{3}-\d{4})")
@@ -59,6 +59,14 @@ ECK_OPERATOR_IMAGE = "elastic/eck-operator"
 
 
 @dataclass(frozen=True)
+class ProductConfig:
+    name: str
+    github_repo: str
+    release_page: str
+    eol_terms: str
+
+
+@dataclass(frozen=True)
 class Release:
     version: str
     major: int
@@ -70,6 +78,22 @@ class Release:
     @property
     def minor_line(self) -> str:
         return f"{self.major}.{self.minor}.x"
+
+
+PRODUCTS = (
+    ProductConfig(
+        name="Elasticsearch",
+        github_repo="elastic/elasticsearch",
+        release_page="https://github.com/elastic/elasticsearch/releases",
+        eol_terms="core_stack",
+    ),
+    ProductConfig(
+        name="Elastic Cloud on Kubernetes",
+        github_repo="elastic/cloud-on-k8s",
+        release_page="https://github.com/elastic/cloud-on-k8s/releases",
+        eol_terms="cloud_on_k8s",
+    ),
+)
 
 
 def bundled_ca_file() -> str | None:
@@ -142,6 +166,7 @@ def add_months(value: dt.date, months: int) -> dt.date:
 
 
 def fetch_releases(
+    repo: str,
     max_pages: int = 20,
     *,
     insecure: bool = False,
@@ -151,7 +176,7 @@ def fetch_releases(
     for page in range(1, max_pages + 1):
         # The HTML releases page is rendered for humans and can omit older
         # entries behind pagination. The API gives stable JSON records instead.
-        url = f"{GITHUB_RELEASES_API}?per_page=100&page={page}"
+        url = f"{GITHUB_RELEASES_API_TEMPLATE.format(repo=repo)}?per_page=100&page={page}"
         payload = json.loads(
             fetch_text(
                 url,
@@ -183,7 +208,7 @@ def fetch_releases(
             )
 
     if not releases:
-        raise RuntimeError("No stable Elasticsearch releases found via GitHub releases API")
+        raise RuntimeError(f"No stable releases found for {repo} via GitHub releases API")
     return sorted(releases, key=lambda release: (release.major, release.minor, release.patch))
 
 
@@ -217,6 +242,40 @@ def find_core_stack_terms(eol_html: str) -> dict[int, dt.date]:
             terms[int(series)] = parse_elastic_date(date_text)
 
     return terms
+
+
+def find_cloud_on_k8s_terms(eol_html: str) -> dict[int, dt.date]:
+    """Extract published maintenance end dates for Elastic Cloud on Kubernetes."""
+    text = strip_html_to_text(eol_html)
+    terms: dict[int, dt.date] = {}
+
+    if "Elastic Cloud on Kubernetes" not in text:
+        return terms
+
+    # Current versions table: "Elastic Cloud on Kubernetes 3.x 15-Oct-2027 ..."
+    for series, date_text in re.findall(
+        r"Elastic Cloud on Kubernetes(?:\^\{\d+\})?\s+(\d+)\.x\s+" + DATE_RE.pattern,
+        text,
+    ):
+        terms[int(series)] = parse_elastic_date(date_text)
+
+    # Prior versions table: the first ECK line includes the product name, while
+    # older prior lines can follow as plain version rows, e.g. "1.9.x ...".
+    prior = text.split("Prior Versions", 1)[1].split("APM Agents", 1)[0] if "Prior Versions" in text else ""
+    if "Elastic Cloud on Kubernetes" in prior:
+        eck_prior = prior.split("Elastic Cloud on Kubernetes", 1)[1]
+        for series, date_text in re.findall(r"\b(\d+)(?:\.\d+)?\.x\s+" + DATE_RE.pattern, eck_prior):
+            terms[int(series)] = parse_elastic_date(date_text)
+
+    return terms
+
+
+def eol_terms_for_product(eol_html: str, product: ProductConfig) -> dict[int, dt.date]:
+    if product.eol_terms == "core_stack":
+        return find_core_stack_terms(eol_html)
+    if product.eol_terms == "cloud_on_k8s":
+        return find_cloud_on_k8s_terms(eol_html)
+    raise ValueError(f"Unknown EOL term parser: {product.eol_terms}")
 
 
 def first_release_date(releases: Iterable[Release], major: int) -> dt.date | None:
@@ -306,6 +365,39 @@ def maintained_lines(releases: list[Release], terms: dict[int, dt.date], at: dt.
     return result
 
 
+def build_product_output(
+    product: ProductConfig,
+    *,
+    eol_html: str | None,
+    at: dt.date,
+    max_pages: int,
+    insecure: bool,
+    ca_file: str | None,
+    ignore_eol_page: bool,
+) -> dict[str, object]:
+    releases = fetch_releases(
+        product.github_repo,
+        max_pages=max_pages,
+        insecure=insecure,
+        ca_file=ca_file,
+    )
+    terms = calculated_major_terms(releases)
+    source_notes = [f"GitHub releases API ({product.github_repo})"]
+
+    if not ignore_eol_page and eol_html is not None:
+        # Elastic may publish table-specific exceptions or later dates.
+        # Prefer those official values over dates inferred from releases.
+        terms.update(eol_terms_for_product(eol_html, product))
+        source_notes.append("Elastic EOL policy page")
+
+    return {
+        "product": product.name,
+        "release_page": product.release_page,
+        "sources": source_notes,
+        "maintained_minor_lines": maintained_lines(releases, terms, at),
+    }
+
+
 def replication_rule_name(prefix: str, suffix: str) -> str:
     return f"{prefix}-{suffix}" if prefix else suffix
 
@@ -382,7 +474,7 @@ def render_mail_template(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Show Elasticsearch versions that should receive maintenance/security updates.",
+        description="Show Elastic product versions that should receive maintenance/security updates.",
     )
     parser.add_argument("--at", default=dt.date.today().isoformat(), help="evaluation date, YYYY-MM-DD")
     parser.add_argument("--json", action="store_true", help="emit JSON instead of text")
@@ -430,33 +522,33 @@ def main() -> int:
     at = dt.date.fromisoformat(args.at)
 
     try:
-        releases = fetch_releases(
-            max_pages=args.max_pages,
-            insecure=args.insecure,
-            ca_file=args.ca_file,
-        )
-        terms = calculated_major_terms(releases)
-        source_notes = ["GitHub releases API"]
-
+        eol_html = None
         if not args.ignore_eol_page:
-            # Elastic may publish table-specific exceptions or later dates.
-            # Prefer those official values over dates inferred from releases.
-            eol_terms = find_core_stack_terms(
-                fetch_text(ELASTIC_EOL_URL, insecure=args.insecure, ca_file=args.ca_file)
+            eol_html = fetch_text(ELASTIC_EOL_URL, insecure=args.insecure, ca_file=args.ca_file)
+        products = [
+            build_product_output(
+                product,
+                eol_html=eol_html,
+                at=at,
+                max_pages=args.max_pages,
+                insecure=args.insecure,
+                ca_file=args.ca_file,
+                ignore_eol_page=args.ignore_eol_page,
             )
-            terms.update(eol_terms)
-            source_notes.append("Elastic EOL policy page")
-
-        lines = maintained_lines(releases, terms, at)
+            for product in PRODUCTS
+        ]
     except (urllib.error.URLError, TimeoutError, RuntimeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
     output = {
-        "product": "Elasticsearch",
         "evaluated_at": at.isoformat(),
-        "sources": source_notes,
-        "maintained_minor_lines": lines,
+        "products": products,
+        # Keep these legacy fields for older static pages or scripts that only
+        # know about the original Elasticsearch-only output format.
+        "product": products[0]["product"],
+        "sources": products[0]["sources"],
+        "maintained_minor_lines": products[0]["maintained_minor_lines"],
     }
 
     if args.output:
@@ -481,18 +573,21 @@ def main() -> int:
         print(json.dumps(output, indent=2, sort_keys=True))
         return 0
 
-    print(f"Elasticsearch maintained minor lines on {at.isoformat()}:")
-    if not lines:
-        print("  No maintained lines found.")
-        return 0
-    for line in lines:
-        print(
-            "  - {minor_line} (latest {latest_release}, released {released}, "
-            "maintenance through {end_of_maintenance})".format(**line)
-        )
-        print(f"    Reason: {line['reason']}")
-        print(f"    Release: {line['url']}")
-    print(f"Sources: {', '.join(source_notes)}")
+    print(f"Elastic maintained minor lines on {at.isoformat()}:")
+    for product in products:
+        product_lines = product["maintained_minor_lines"]
+        print(f"\n{product['product']}:")
+        if not product_lines:
+            print("  No maintained lines found.")
+            continue
+        for line in product_lines:
+            print(
+                "  - {minor_line} (latest {latest_release}, released {released}, "
+                "maintenance through {end_of_maintenance})".format(**line)
+            )
+            print(f"    Reason: {line['reason']}")
+            print(f"    Release: {line['url']}")
+        print(f"  Sources: {', '.join(product['sources'])}")
     return 0
 
 

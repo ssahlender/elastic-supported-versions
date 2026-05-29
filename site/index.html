@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Elasticsearch Supported Versions</title>
+    <title>Elastic Supported Versions</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -11,12 +11,13 @@
       <header class="masthead" aria-labelledby="page-title">
         <div>
           <p class="eyebrow">Maintenance reference</p>
-          <h1 id="page-title">Elasticsearch Supported Versions</h1>
+          <h1 id="page-title">Elastic Supported Versions</h1>
           <p class="summary" id="summary">Loading current maintenance data...</p>
         </div>
         <nav class="top-links" aria-label="Reference links">
           <a href="https://www.elastic.co/support/eol">Elastic EOL policy</a>
           <a href="https://github.com/elastic/elasticsearch/releases">Elasticsearch releases</a>
+          <a href="https://github.com/elastic/cloud-on-k8s/releases">ECK releases</a>
         </nav>
       </header>
 
@@ -38,9 +39,23 @@
       </section>
 
       <section class="versions-panel" aria-labelledby="versions-title">
-        <div class="section-heading">
+        <div class="section-heading main-section-heading">
           <h2 id="versions-title">Maintained minor lines</h2>
           <span class="count-pill" id="line-count">-</span>
+        </div>
+        <div id="product-panels"></div>
+        <p class="error-message" id="error-message" hidden></p>
+      </section>
+    </main>
+
+    <template id="product-template">
+      <section class="product-section">
+        <div class="section-heading product-heading">
+          <div>
+            <h3 data-field="product"></h3>
+            <a data-field="release_page" href="#">Release source</a>
+          </div>
+          <span class="count-pill" data-field="count"></span>
         </div>
         <div class="table-wrap">
           <table>
@@ -54,12 +69,11 @@
                 <th scope="col">Release</th>
               </tr>
             </thead>
-            <tbody id="version-table-body"></tbody>
+            <tbody data-field="tbody"></tbody>
           </table>
         </div>
-        <p class="error-message" id="error-message" hidden></p>
       </section>
-    </main>
+    </template>
 
     <template id="version-row-template">
       <tr>
@@ -82,30 +96,54 @@
       }
 
       function render(data) {
-        const lines = data.maintained_minor_lines || [];
+        const products = data.products || [{
+          product: data.product,
+          release_page: "https://github.com/elastic/elasticsearch/releases",
+          sources: data.sources,
+          maintained_minor_lines: data.maintained_minor_lines || []
+        }];
+        const totalLines = products.reduce(
+          (count, product) => count + (product.maintained_minor_lines || []).length,
+          0
+        );
         document.getElementById("evaluated-at").textContent = data.evaluated_at || "-";
-        document.getElementById("product").textContent = data.product || "-";
-        document.getElementById("sources").textContent = (data.sources || []).join(", ") || "-";
-        document.getElementById("line-count").textContent = `${lines.length} active`;
+        document.getElementById("product").textContent =
+          products.map((product) => product.product).join(", ") || "-";
+        document.getElementById("sources").textContent =
+          Array.from(new Set(products.flatMap((product) => product.sources || []))).join(", ") || "-";
+        document.getElementById("line-count").textContent = `${totalLines} active`;
         document.getElementById("summary").textContent =
-          lines.length === 1
+          totalLines === 1
             ? "1 minor line is currently within Elastic maintenance policy."
-            : `${lines.length} minor lines are currently within Elastic maintenance policy.`;
+            : `${totalLines} minor lines are currently within Elastic maintenance policy.`;
 
+        const productTemplate = document.getElementById("product-template");
         const template = document.getElementById("version-row-template");
-        const body = document.getElementById("version-table-body");
-        body.replaceChildren();
+        const panels = document.getElementById("product-panels");
+        panels.replaceChildren();
 
-        for (const line of lines) {
-          const row = template.content.cloneNode(true);
-          row.querySelector('[data-field="minor_line"]').textContent = line.minor_line;
-          row.querySelector('[data-field="latest_release"]').textContent = line.latest_release;
-          row.querySelector('[data-field="released"]').textContent = line.released;
-          row.querySelector('[data-field="end_of_maintenance"]').textContent = line.end_of_maintenance;
-          row.querySelector('[data-field="reason"]').textContent = line.reason;
-          const link = row.querySelector('[data-field="url"]');
-          link.href = line.url;
-          body.appendChild(row);
+        for (const product of products) {
+          const productNode = productTemplate.content.cloneNode(true);
+          const lines = product.maintained_minor_lines || [];
+          productNode.querySelector('[data-field="product"]').textContent = product.product || "-";
+          productNode.querySelector('[data-field="count"]').textContent = `${lines.length} active`;
+          const releasePage = productNode.querySelector('[data-field="release_page"]');
+          releasePage.href = product.release_page || "#";
+          const body = productNode.querySelector('[data-field="tbody"]');
+
+          for (const line of lines) {
+            const row = template.content.cloneNode(true);
+            row.querySelector('[data-field="minor_line"]').textContent = line.minor_line;
+            row.querySelector('[data-field="latest_release"]').textContent = line.latest_release;
+            row.querySelector('[data-field="released"]').textContent = line.released;
+            row.querySelector('[data-field="end_of_maintenance"]').textContent = line.end_of_maintenance;
+            row.querySelector('[data-field="reason"]').textContent = line.reason;
+            const link = row.querySelector('[data-field="url"]');
+            link.href = line.url;
+            body.appendChild(row);
+          }
+
+          panels.appendChild(productNode);
         }
       }
 

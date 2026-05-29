@@ -1,34 +1,104 @@
 {
-  "evaluated_at": "2026-05-06",
+  "evaluated_at": "2026-05-29",
   "maintained_minor_lines": [
     {
       "end_of_maintenance": "2027-10-15",
-      "latest_release": "9.4.0",
+      "latest_release": "9.4.2",
       "minor_line": "9.4.x",
       "reason": "one of the two newest minor releases of the current major",
-      "released": "2026-05-05",
-      "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.4.0"
+      "released": "2026-05-28",
+      "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.4.2"
     },
     {
       "end_of_maintenance": "2027-10-15",
-      "latest_release": "9.3.4",
+      "latest_release": "9.3.5",
       "minor_line": "9.3.x",
       "reason": "one of the two newest minor releases of the current major",
-      "released": "2026-04-30",
-      "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.3.4"
+      "released": "2026-05-28",
+      "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.3.5"
     },
     {
       "end_of_maintenance": "2027-01-15",
-      "latest_release": "8.19.15",
+      "latest_release": "8.19.16",
       "minor_line": "8.19.x",
       "reason": "final minor release of the previous major",
-      "released": "2026-04-30",
-      "url": "https://github.com/elastic/elasticsearch/releases/tag/v8.19.15"
+      "released": "2026-05-28",
+      "url": "https://github.com/elastic/elasticsearch/releases/tag/v8.19.16"
     }
   ],
   "product": "Elasticsearch",
+  "products": [
+    {
+      "maintained_minor_lines": [
+        {
+          "end_of_maintenance": "2027-10-15",
+          "latest_release": "9.4.2",
+          "minor_line": "9.4.x",
+          "reason": "one of the two newest minor releases of the current major",
+          "released": "2026-05-28",
+          "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.4.2"
+        },
+        {
+          "end_of_maintenance": "2027-10-15",
+          "latest_release": "9.3.5",
+          "minor_line": "9.3.x",
+          "reason": "one of the two newest minor releases of the current major",
+          "released": "2026-05-28",
+          "url": "https://github.com/elastic/elasticsearch/releases/tag/v9.3.5"
+        },
+        {
+          "end_of_maintenance": "2027-01-15",
+          "latest_release": "8.19.16",
+          "minor_line": "8.19.x",
+          "reason": "final minor release of the previous major",
+          "released": "2026-05-28",
+          "url": "https://github.com/elastic/elasticsearch/releases/tag/v8.19.16"
+        }
+      ],
+      "product": "Elasticsearch",
+      "release_page": "https://github.com/elastic/elasticsearch/releases",
+      "sources": [
+        "GitHub releases API (elastic/elasticsearch)",
+        "Elastic EOL policy page"
+      ]
+    },
+    {
+      "maintained_minor_lines": [
+        {
+          "end_of_maintenance": "2027-10-15",
+          "latest_release": "3.4.0",
+          "minor_line": "3.4.x",
+          "reason": "one of the two newest minor releases of the current major",
+          "released": "2026-05-05",
+          "url": "https://github.com/elastic/cloud-on-k8s/releases/tag/v3.4.0"
+        },
+        {
+          "end_of_maintenance": "2027-10-15",
+          "latest_release": "3.3.2",
+          "minor_line": "3.3.x",
+          "reason": "one of the two newest minor releases of the current major",
+          "released": "2026-04-01",
+          "url": "https://github.com/elastic/cloud-on-k8s/releases/tag/v3.3.2"
+        },
+        {
+          "end_of_maintenance": "2027-01-15",
+          "latest_release": "2.16.1",
+          "minor_line": "2.16.x",
+          "reason": "final minor release of the previous major",
+          "released": "2025-01-21",
+          "url": "https://github.com/elastic/cloud-on-k8s/releases/tag/v2.16.1"
+        }
+      ],
+      "product": "Elastic Cloud on Kubernetes",
+      "release_page": "https://github.com/elastic/cloud-on-k8s/releases",
+      "sources": [
+        "GitHub releases API (elastic/cloud-on-k8s)",
+        "Elastic EOL policy page"
+      ]
+    }
+  ],
   "sources": [
-    "GitHub releases API",
+    "GitHub releases API (elastic/elasticsearch)",
     "Elastic EOL policy page"
   ]
 }
