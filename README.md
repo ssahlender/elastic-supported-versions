@@ -63,8 +63,12 @@ Emit a short German mail template for the Harbor replication-rule request:
 ./elastic_supported_versions.py --mail-template
 ```
 
-The template includes Docker pull commands for the maintained Elasticsearch
-patch versions and these Docker Hub replication rules:
+The template includes Docker pull commands for the newest maintained
+Elasticsearch patch release in major 9 and major 8. If the support policy
+currently maintains multiple minor lines in a major, the mail still includes
+only the newest patch release for that major.
+
+The mail references these Docker Hub replication rules:
 
 - `harbor-elastic-elasticsearch`
 - `harbor-elastic-filebeat`

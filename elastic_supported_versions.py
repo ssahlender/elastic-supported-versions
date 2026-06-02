@@ -56,6 +56,7 @@ DOCKER_HUB_REPLICATION_IMAGES = (
 DEFAULT_REPLICATION_RULE_PREFIX = "harbor-elastic"
 ECK_OPERATOR_REPLICATION_RULE_SUFFIX = "eckoperator"
 ECK_OPERATOR_IMAGE = "elastic/eck-operator"
+MAIL_RELEASE_MAJORS = (8, 9)
 
 
 @dataclass(frozen=True)
@@ -414,6 +415,37 @@ def docker_pull_commands(version: str, *, replication_rule_prefix: str) -> list[
     ]
 
 
+def version_key(version: str) -> tuple[int, int, int]:
+    match = VERSION_RE.match(version)
+    if not match:
+        raise ValueError(f"Invalid release version: {version}")
+    return tuple(int(part) for part in match.groups())
+
+
+def latest_mail_release_lines(
+    maintained_minor_lines: list[object],
+    *,
+    majors: tuple[int, ...] = MAIL_RELEASE_MAJORS,
+) -> list[dict[str, str]]:
+    latest_by_major: dict[int, dict[str, str]] = {}
+
+    for line in maintained_minor_lines:
+        if not isinstance(line, dict):
+            continue
+        version = str(line["latest_release"])
+        major, minor, patch = version_key(version)
+        if major not in majors:
+            continue
+        current = latest_by_major.get(major)
+        if current is None or (major, minor, patch) > version_key(str(current["latest_release"])):
+            latest_by_major[major] = {str(key): str(value) for key, value in line.items()}
+
+    return [
+        latest_by_major[major]
+        for major in sorted(latest_by_major, reverse=True)
+    ]
+
+
 def render_mail_template(
     output: dict[str, object],
     *,
@@ -423,13 +455,14 @@ def render_mail_template(
     lines = output["maintained_minor_lines"]
     if not isinstance(lines, list):
         raise ValueError("maintained_minor_lines must be a list")
+    mail_lines = latest_mail_release_lines(lines)
 
     message: list[str] = [
         "Subject: Harbor Replication Rules fuer Elastic Stack aktualisieren",
         "",
         "Hallo zusammen,",
         "",
-        "koennt ihr bitte die Harbor Replication Rules fuer die aktuell supporteten Elastic Stack Versionen aktualisieren?",
+        "koennt ihr bitte die Harbor Replication Rules fuer die neuesten supporteten Elastic Stack Versionen aktualisieren?",
         "",
         f"Stand: {output['evaluated_at']}",
         "",
@@ -450,9 +483,7 @@ def render_mail_template(
                 f"docker pull {ECK_OPERATOR_IMAGE}:{eck_operator_version}  # {eck_rule}",
             ]
         )
-    for line in lines:
-        if not isinstance(line, dict):
-            continue
+    for line in mail_lines:
         version = str(line["latest_release"])
         message.extend(
             [
