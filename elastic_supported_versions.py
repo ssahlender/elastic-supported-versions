@@ -111,13 +111,17 @@ def fetch_text(
     accept: str = "text/html",
     insecure: bool = False,
     ca_file: str | None = None,
+    bearer_token: str | None = None,
 ) -> str:
+    headers = {
+        "Accept": accept,
+        "User-Agent": "elastic-maintenance-check/1.0",
+    }
+    if bearer_token:
+        headers["Authorization"] = f"Bearer {bearer_token}"
     request = urllib.request.Request(
         url,
-        headers={
-            "Accept": accept,
-            "User-Agent": "elastic-maintenance-check/1.0",
-        },
+        headers=headers,
     )
     context = None
     if insecure:
@@ -172,6 +176,7 @@ def fetch_releases(
     *,
     insecure: bool = False,
     ca_file: str | None = None,
+    github_token: str | None = None,
 ) -> list[Release]:
     releases: list[Release] = []
     for page in range(1, max_pages + 1):
@@ -184,6 +189,7 @@ def fetch_releases(
                 accept="application/vnd.github+json",
                 insecure=insecure,
                 ca_file=ca_file,
+                bearer_token=github_token,
             )
         )
         if not payload:
@@ -374,6 +380,7 @@ def build_product_output(
     max_pages: int,
     insecure: bool,
     ca_file: str | None,
+    github_token: str | None,
     ignore_eol_page: bool,
 ) -> dict[str, object]:
     releases = fetch_releases(
@@ -381,6 +388,7 @@ def build_product_output(
         max_pages=max_pages,
         insecure=insecure,
         ca_file=ca_file,
+        github_token=github_token,
     )
     terms = calculated_major_terms(releases)
     source_notes = [f"GitHub releases API ({product.github_repo})"]
@@ -564,6 +572,7 @@ def main() -> int:
                 max_pages=args.max_pages,
                 insecure=args.insecure,
                 ca_file=args.ca_file,
+                github_token=os.environ.get("GITHUB_TOKEN"),
                 ignore_eol_page=args.ignore_eol_page,
             )
             for product in PRODUCTS

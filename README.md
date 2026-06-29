@@ -31,6 +31,10 @@ Sources:
 
 No third-party Python packages are required.
 
+Set `GITHUB_TOKEN` to authenticate GitHub API requests and avoid the much
+smaller anonymous rate limit. GitHub Actions uses the workflow's built-in token
+automatically through the included workflow configuration.
+
 ## Usage
 
 Run with today's date:
