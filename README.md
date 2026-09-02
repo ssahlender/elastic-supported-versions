@@ -161,3 +161,8 @@ After deployment, the site will be available at
 <https://ssahlender.github.io/elastic-supported-versions/>.
 
 The workflow also runs daily at 06:00 UTC.
+
+Public GitHub repositories disable scheduled workflows automatically after 60
+days without repository activity. The workflow prevents this by creating an
+empty keepalive commit during scheduled runs if the latest commit is at least 45
+days old.
