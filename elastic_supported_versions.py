@@ -227,24 +227,33 @@ def strip_html_to_text(markup: str) -> str:
     return re.sub(r"\s+", " ", text)
 
 
+def active_policy_text(text: str) -> str:
+    """Return the supported/prior policy tables, excluding retired products."""
+    lower_text = text.lower()
+    retired_markers = [
+        "retired software products below software products",
+        "below software products are being retired",
+    ]
+    indexes = [
+        lower_text.find(marker)
+        for marker in retired_markers
+        if lower_text.find(marker) != -1
+    ]
+    if not indexes:
+        raise ValueError("Could not locate retired-products boundary in Elastic EOL page")
+    return text[: min(indexes)]
+
+
 def find_core_stack_terms(eol_html: str) -> dict[int, dt.date]:
     """Extract published maintenance end dates for Core Stack major series."""
-    text = strip_html_to_text(eol_html)
+    text = active_policy_text(strip_html_to_text(eol_html))
     terms: dict[int, dt.date] = {}
 
     # The page has several product families. Elasticsearch belongs to the
     # "Core Stack" rows, so avoid accidentally reading APM agent or retired
     # product dates that use the same x.y.x notation.
-    for section_start, section_end in [
-        ("Current Versions", "Prior Versions"),
-        ("Prior Versions", "Retired Software Products"),
-    ]:
-        if section_start not in text or section_end not in text:
-            continue
-        section = text.split(section_start, 1)[1].split(section_end, 1)[0]
-        if "Core Stack" not in section:
-            continue
-        core = section.split("Core Stack", 1)[1].split("Orchestration", 1)[0]
+    for match in re.finditer(r"Core Stack\s+(.*?)\s+Orchestration\b", text):
+        core = match.group(1)
         for series, date_text in re.findall(r"\b(\d+)(?:\.\d+)?\.x\s+" + DATE_RE.pattern, core):
             terms[int(series)] = parse_elastic_date(date_text)
 
@@ -253,25 +262,18 @@ def find_core_stack_terms(eol_html: str) -> dict[int, dt.date]:
 
 def find_cloud_on_k8s_terms(eol_html: str) -> dict[int, dt.date]:
     """Extract published maintenance end dates for Elastic Cloud on Kubernetes."""
-    text = strip_html_to_text(eol_html)
+    text = active_policy_text(strip_html_to_text(eol_html))
     terms: dict[int, dt.date] = {}
 
     if "Elastic Cloud on Kubernetes" not in text:
         return terms
 
-    # Current versions table: "Elastic Cloud on Kubernetes 3.x 15-Oct-2027 ..."
-    for series, date_text in re.findall(
-        r"Elastic Cloud on Kubernetes(?:\^\{\d+\})?\s+(\d+)\.x\s+" + DATE_RE.pattern,
-        text,
-    ):
-        terms[int(series)] = parse_elastic_date(date_text)
-
-    # Prior versions table: the first ECK line includes the product name, while
-    # older prior lines can follow as plain version rows, e.g. "1.9.x ...".
-    prior = text.split("Prior Versions", 1)[1].split("APM Agents", 1)[0] if "Prior Versions" in text else ""
-    if "Elastic Cloud on Kubernetes" in prior:
-        eck_prior = prior.split("Elastic Cloud on Kubernetes", 1)[1]
-        for series, date_text in re.findall(r"\b(\d+)(?:\.\d+)?\.x\s+" + DATE_RE.pattern, eck_prior):
+    for match in re.finditer(r"Orchestration\s+(.*?)\s+APM Agents\b", text):
+        orchestration = match.group(1)
+        if "Elastic Cloud on Kubernetes" not in orchestration:
+            continue
+        eck_section = orchestration.split("Elastic Cloud on Kubernetes", 1)[1]
+        for series, date_text in re.findall(r"\b(\d+)(?:\.\d+)?\.x\s+" + DATE_RE.pattern, eck_section):
             terms[int(series)] = parse_elastic_date(date_text)
 
     return terms
@@ -396,7 +398,10 @@ def build_product_output(
     if not ignore_eol_page and eol_html is not None:
         # Elastic may publish table-specific exceptions or later dates.
         # Prefer those official values over dates inferred from releases.
-        terms.update(eol_terms_for_product(eol_html, product))
+        eol_terms = eol_terms_for_product(eol_html, product)
+        if not eol_terms:
+            raise RuntimeError(f"No EOL terms parsed for {product.name} from Elastic EOL policy page")
+        terms.update(eol_terms)
         source_notes.append("Elastic EOL policy page")
 
     return {
