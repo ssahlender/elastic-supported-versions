@@ -42,6 +42,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Run tests
+        run: python -m unittest discover
+
       - name: Generate data
         run: python elastic_supported_versions.py --output site/data.json
         env:

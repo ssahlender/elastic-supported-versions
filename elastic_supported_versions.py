@@ -56,7 +56,6 @@ DOCKER_HUB_REPLICATION_IMAGES = (
 DEFAULT_REPLICATION_RULE_PREFIX = "harbor-elastic"
 ECK_OPERATOR_REPLICATION_RULE_SUFFIX = "eckoperator"
 ECK_OPERATOR_IMAGE = "elastic/eck-operator"
-MAIL_RELEASE_MAJORS = (8, 9)
 
 
 @dataclass(frozen=True)
@@ -437,8 +436,6 @@ def version_key(version: str) -> tuple[int, int, int]:
 
 def latest_mail_release_lines(
     maintained_minor_lines: list[object],
-    *,
-    majors: tuple[int, ...] = MAIL_RELEASE_MAJORS,
 ) -> list[dict[str, str]]:
     latest_by_major: dict[int, dict[str, str]] = {}
 
@@ -447,8 +444,6 @@ def latest_mail_release_lines(
             continue
         version = str(line["latest_release"])
         major, minor, patch = version_key(version)
-        if major not in majors:
-            continue
         current = latest_by_major.get(major)
         if current is None or (major, minor, patch) > version_key(str(current["latest_release"])):
             latest_by_major[major] = {str(key): str(value) for key, value in line.items()}
@@ -600,7 +595,7 @@ def main() -> int:
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        if not args.json:
+        if not args.json and not args.mail_template:
             print(f"Wrote {output_path}")
             return 0
 
